@@ -3,14 +3,12 @@ import { defineStore } from 'pinia'
 import { ethers } from 'ethers'
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses'
 import userRoleABI from '@/abi/UserRole.json'
+import myTokenABI from '@/abi/MyToken.json'
 
 const MTK_ADDRESS = CONTRACT_ADDRESSES.token
-const USER_ROLE_ADDRESS = CONTRACT_ADDRESSES.userRole;
-const MTK_ABI = [   // MTK 合約的 ABI
-  "event Transfer(address indexed from, address indexed to, uint256 value)",
-  "function balanceOf(address) view returns (uint256)",
-  "function decimals() view returns (uint8)"
-]
+const USER_ROLE_ADDRESS = CONTRACT_ADDRESSES.userRole
+const MTK_ABI = myTokenABI.abi
+const USER_ROLE_ABI = userRoleABI.abi
 
 export const useWalletStore = defineStore('wallet', {
   state: () => ({
@@ -42,12 +40,12 @@ export const useWalletStore = defineStore('wallet', {
     async getTransactionHistory() {
       const provider = new ethers.BrowserProvider(window.ethereum)
       const latestBlock = await provider.getBlockNumber()
-      const START_BLOCK = Math.max(0, latestBlock - 100) // 取得最近100個區塊的交易歷史
+      const START_BLOCK = Math.max(0, latestBlock - 100)
       const history = []
 
       for (let i = latestBlock; i >= START_BLOCK; i--) {
         const block = await provider.send("eth_getBlockByNumber", [
-          ethers.toBeHex(i),  // e.g., "0x1a"
+          ethers.toBeHex(i),
           true
         ])
 
@@ -71,8 +69,6 @@ export const useWalletStore = defineStore('wallet', {
 
       this.transactionHistory = history
       return history
-
-
     },
     async getMTKTransfers() {
       if (!this.account) return [];
@@ -83,15 +79,12 @@ export const useWalletStore = defineStore('wallet', {
       const latestBlock = await provider.getBlockNumber();
       const fromBlock = Math.max(0, latestBlock - 10000);
 
-      // 查詢你是 from 的
       const filterFrom = token.filters.Transfer(this.account, null);
       const logsFrom = await token.queryFilter(filterFrom, fromBlock, latestBlock);
 
-      // 查詢你是 to 的
       const filterTo = token.filters.Transfer(null, this.account);
       const logsTo = await token.queryFilter(filterTo, fromBlock, latestBlock);
 
-      // 合併並去重
       const allLogs = [...logsFrom, ...logsTo].sort((a, b) => b.blockNumber - a.blockNumber);
       const seen = new Set();
       const transfers = allLogs.filter(log => {
@@ -115,11 +108,16 @@ export const useWalletStore = defineStore('wallet', {
     },
     async getMTKBalance() {
       if (!this.account) return "0";
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const token = new ethers.Contract(MTK_ADDRESS, MTK_ABI, provider); // MTK 合約地址
-      const decimals = await token.decimals();
-      const balance = await token.balanceOf(this.account);
-      return ethers.formatUnits(balance, decimals);
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const token = new ethers.Contract(MTK_ADDRESS, MTK_ABI, provider);
+        const decimals = await token.decimals();
+        const balance = await token.balanceOf(this.account);
+        return ethers.formatUnits(balance, decimals);
+      } catch (err) {
+        console.error('Error fetching MTK balance:', err);
+        return "0";
+      }
     },
     getTotalSpent() {
       return this.transactionHistory
@@ -132,12 +130,18 @@ export const useWalletStore = defineStore('wallet', {
         this.currentRole = null;
         return null;
       }
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(USER_ROLE_ADDRESS, userRoleABI, provider);
-      const role = await contract.getRole(this.account);
-      this.currentRole = Number(role);
-      return this.currentRole;
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(USER_ROLE_ADDRESS, USER_ROLE_ABI, provider);
+        const role = await contract.getRole(this.account);
+        this.currentRole = Number(role);
+        console.log('Current role:', this.currentRole);
+        return this.currentRole;
+      } catch (err) {
+        console.error('Error fetching role:', err);
+        this.currentRole = null;
+        return null;
+      }
     },
-
   }
 })
