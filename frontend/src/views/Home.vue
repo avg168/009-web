@@ -15,7 +15,7 @@
                   <v-row align="center" no-gutters>
                     <v-icon color="error" icon="mdi-alpha-t-box" size="55"></v-icon>
                     <v-col class="text-h3" cols="8">
-                      {{ mtkBalance }}
+                      {{ mtkBalance/10**18 }}
                     </v-col>
                   </v-row>
                   <v-card-item>
@@ -41,7 +41,7 @@
                 <v-card-item>
                   <v-card-title>
                     <v-icon color="error" icon="mdi-alpha-t-box"></v-icon>
-                    <span>MTK交易總額: {{ walletStore.getTotalMTKSpent() }} MTK</span>
+                    <span>MTK交易總額: {{ walletStore.getTotalMTKSpent()/10**18 }} MTK</span>
                 </v-card-title>
 
                 <v-card-subtitle>
@@ -200,7 +200,7 @@
                 <div v-for="(mtk, idx) in walletStore.mtkTransfers.slice(0, 10)" :key="'mtk-' + idx">
                   <p>From: {{ mtk.from }}</p>
                   <p>To: {{ mtk.to }}</p>
-                  <p>Value: {{ mtk.value }} MTK</p>
+                  <p>Value: {{ mtk.value/10**18 }} MTK</p>
                   <v-chip color="success" size="small" class="ma-1">轉帳</v-chip>
                   <hr />
                 </div>
