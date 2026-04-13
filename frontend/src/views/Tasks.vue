@@ -30,28 +30,60 @@
             </div>
           </template>
           <template #item.status="{ item }">
-            <v-chip 
-              :color="item.userClaimed ? 'green' : (item.exists ? 'orange' : 'grey')" 
-              size="small" 
-              class="text-white">
-              {{ item.userClaimed ? '已領取' : (item.exists ? '可領取' : '已取消') }}
+            <v-chip
+              :color="getTaskStatusColor(item)"
+              size="small"
+              class="text-white"
+            >
+              {{ getTaskStatusLabel(item) }}
             </v-chip>
           </template>
           <template #item.actions="{ item }">
-            <v-btn 
-              v-if="item.exists && !item.userClaimed && (item.taskType !== 0 || item.canClaim)"
-              size="small" 
-              color="primary"
-              @click="claimTask(item.taskId)"
-              :loading="claimingId === item.taskId">
-              領取獎勵
-            </v-btn>
-            <span v-else-if="item.userClaimed" class="text-success">✓ 已領</span>
-            <span v-else class="text-grey">不可領</span>
+            <v-row class="g-2" align="center" no-gutters>
+              <v-col cols="auto">
+                <v-btn 
+                  v-if="item.exists && item.taskType === 0 && !item.userClaimed && item.canClaim"
+                  size="small" 
+                  color="primary"
+                  @click="claimTask(item.taskId)"
+                  :loading="claimingId === item.taskId">
+                  領取獎勵
+                </v-btn>
+                <v-btn
+                  v-else-if="item.exists && item.taskType === 2 && !item.userClaimed && item.currentClaims < item.maxClaims"
+                  size="small"
+                  color="primary"
+                  @click="scannerTaskId = item.taskId"
+                >
+                  掃描領取
+                </v-btn>
+                <span v-else-if="item.userClaimed" class="text-success">✓ 已領</span>
+                <span v-else class="text-grey">不可領</span>
+              </v-col>
+              <v-col cols="auto" v-if="item.taskType === 2 && walletStore.currentRole === 3">
+                <v-btn
+                  size="small"
+                  color="secondary"
+                  @click="showQRCode(item.taskId)"
+                >
+                  查看 QR Code
+                </v-btn>
+              </v-col>
+            </v-row>
           </template>
         </v-data-table>
         <v-alert v-if="successMsg" type="success" class="mt-4">{{ successMsg }}</v-alert>
         <v-alert v-if="errorMsg" type="error" class="mt-4">{{ errorMsg }}</v-alert>
+
+        <div v-if="selectedQRCodeTaskId !== null" class="mt-4">
+          <QRCodeGenerator :taskId="selectedQRCodeTaskId" />
+          <v-btn color="secondary" class="mt-2" @click="selectedQRCodeTaskId = null">關閉 QR Code</v-btn>
+        </div>
+
+        <div v-if="scannerTaskId !== null" class="mt-4">
+          <QRCodeScanner />
+          <v-btn color="secondary" class="mt-2" @click="scannerTaskId = null">關閉掃描器</v-btn>
+        </div>
       </div>
     </v-card>
   </v-container>
@@ -59,10 +91,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useWalletStore } from '@/store/walletStore'
 import { ethers } from 'ethers'
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses'
 import taskRewardABI from '@/abi/TaskReward.json'
 import paymentABI from '@/abi/Payment.json'
+import QRCodeGenerator from '@/components/QRCodeGenerator.vue'
+import QRCodeScanner from '@/components/QRCodeScanner.vue'
 
 const headers = ref([
   { title: '任務編號', key: 'taskId', width: '80px' },
@@ -74,9 +109,12 @@ const headers = ref([
   { title: '操作', key: 'actions', width: '120px' },
 ])
 
+const walletStore = useWalletStore()
 const tasks = ref([])
 const loading = ref(false)
 const claimingId = ref(null)
+const selectedQRCodeTaskId = ref(null)
+const scannerTaskId = ref(null)
 const successMsg = ref('')
 const errorMsg = ref('')
 
@@ -87,16 +125,35 @@ const TASK_TYPES = {
 }
 
 function getTaskTypeName(type) {
-  return TASK_TYPES[type]?.name || '未知'
+  return TASK_TYPES[Number(type)]?.name || '未知'
 }
 
 function getTaskTypeColor(type) {
-  return TASK_TYPES[type]?.color || 'grey'
+  return TASK_TYPES[Number(type)]?.color || 'grey'
+}
+
+function getTaskStatusLabel(item) {
+  if (item.userClaimed) return '已領取'
+
+  if (item.canClaim) {
+    if (item.taskType === 2) return '掃描領取'
+    return '可領取'
+  }
+
+  if (item.taskType === 0) return '尚未達標'
+  if (item.taskType === 2) return '等待掃描'
+  return '不可領'
+}
+
+function getTaskStatusColor(item) {
+  if (item.userClaimed) return 'green'
+  if (item.canClaim) return item.taskType === 2 ? 'warning' : 'orange'
+  return 'grey'
 }
 
 function formatToken(wei) {
-  if (!wei) return '0'
-  return (Number(wei) / 1e18).toFixed(2)
+  if (wei === null || wei === undefined) return '0.00'
+  return Number(ethers.formatUnits(wei, 18)).toFixed(2)
 }
 
 const loadTasks = async () => {
@@ -128,6 +185,7 @@ const loadTasks = async () => {
       const task = await taskRewardContract.getTask(i)
       // 新的 getTask 回傳順序: taskType[0], description[1], reward[2], maxClaims[3], currentClaims[4], targetAmount[5], createdBy[6], createdAt[7], exists[8]
       const [taskType, description, reward, maxClaims, currentClaims, targetAmount, createdBy, createdAt, exists] = task
+      const numericTaskType = Number(taskType)
 
       // 過濾已取消的任務
       if (!exists) continue
@@ -138,7 +196,7 @@ const loadTasks = async () => {
       let userConsumption = BigInt(0)
       let canClaim = false
 
-      if (taskType === 0) {
+      if (numericTaskType === 0) {
         // Consumer 類型
         userConsumption = await paymentContract.getTotalPaidFromTo(userAddress, createdBy)
         canClaim = userConsumption >= targetAmount && !userClaimed
@@ -149,7 +207,7 @@ const loadTasks = async () => {
 
       taskList.push({
         taskId: i,
-        taskType: Number(taskType),
+        taskType: numericTaskType,
         description,
         reward,
         maxClaims: Number(maxClaims),
@@ -199,6 +257,10 @@ const claimTask = async (taskId) => {
   } finally {
     claimingId.value = null
   }
+}
+
+function showQRCode(taskId) {
+  selectedQRCodeTaskId.value = taskId
 }
 
 onMounted(loadTasks)

@@ -29,6 +29,8 @@
         </v-form>
         <v-alert v-if="successMsg" type="success" class="mt-2">{{ successMsg }}</v-alert>
         <v-alert v-if="errorMsg" type="error" class="mt-2">{{ errorMsg }}</v-alert>
+        <!-- 顯示 QR Code 給 Event 任務 -->
+        <QRCodeGenerator v-if="taskType === '2' && publishedTaskId !== null" :taskId="publishedTaskId" />
       </v-card-text>
     </v-card>
   </v-container>
@@ -40,6 +42,7 @@ import { ethers } from 'ethers'
 import { CONTRACT_ADDRESSES } from '@/contracts/addresses'
 import taskRewardABI from '@/abi/TaskReward.json'
 import myTokenABI from '@/abi/MyToken.json'
+import QRCodeGenerator from '@/components/QRCodeGenerator.vue'
 
 const taskName = ref('')
 const taskType = ref('0')
@@ -50,6 +53,7 @@ const maxClaims = ref(1)
 const loading = ref(false)
 const successMsg = ref('')
 const errorMsg = ref('')
+const publishedTaskId = ref(null)
 
 async function publishTask() {
   loading.value = true
@@ -88,6 +92,10 @@ async function publishTask() {
       targetAmountWei               // targetAmount (wei)
     )
     await tx.wait()
+
+    // 獲取任務 ID（nextTaskId - 1）
+    const nextTaskId = await taskRewardContract.nextTaskId()
+    publishedTaskId.value = Number(nextTaskId) - 1
 
     successMsg.value = '✅ 任務已成功發布！'
     taskName.value = ''

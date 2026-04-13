@@ -60,8 +60,24 @@ async function onDetect(detectedCodes) {
   try {
     const raw = detectedCodes[0].rawValue;
     console.log("掃描內容：", raw);
+    
+    // 檢查是否是任務 ID（數字）
+    if (/^\d+$/.test(raw)) {
+      const taskId = parseInt(raw);
+      // 調用 completeTask
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const taskRewardABI = (await import('@/abi/TaskReward.json')).default;
+      const taskRewardContract = new ethers.Contract(CONTRACT_ADDRESSES.taskReward, taskRewardABI.abi, signer);
+      const tx = await taskRewardContract.completeTask(taskId);
+      await tx.wait();
+      result.value = `✅ 成功領取任務 #${taskId} 的獎勵！`;
+      error.value = "";
+      return;
+    }
+    
+    // 否則，解析為轉帳數據
     const data = JSON.parse(raw);
-
     const toAddress = data.address;
     const amount = data.amount;
     const token = data.token || "ETH";
@@ -96,8 +112,8 @@ async function onDetect(detectedCodes) {
     }
     error.value = "";
   } catch (err) {
-    console.error("轉帳錯誤：", err);
-    error.value = "❌ 轉帳失敗：" + err.message;
+    console.error("操作錯誤：", err);
+    error.value = "❌ 操作失敗：" + err.message;
   }
 }
 
