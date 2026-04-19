@@ -16,7 +16,7 @@
             </v-chip>
           </template>
           <template #item.description="{ item }">
-            <span>{{ item.description }}</span>
+            <span>{{ item.displayDescription }}</span>
           </template>
           <template #item.reward="{ item }">
             {{ formatToken(item.reward) }} MTK
@@ -50,6 +50,23 @@
                   領取獎勵
                 </v-btn>
                 <v-btn
+                  v-else-if="item.exists && item.taskType === 1 && !item.userClaimed && item.canClaim"
+                  size="small"
+                  color="primary"
+                  @click="openSurvey(item)"
+                >
+                  填寫問卷
+                </v-btn>
+                <v-btn
+                  v-else-if="item.exists && item.taskType === 1 && !item.userClaimed && !item.canClaim && item.surveySubmitted"
+                  size="small"
+                  color="success"
+                  @click="claimTask(item.taskId)"
+                  :loading="claimingId === item.taskId"
+                >
+                  領取獎勵
+                </v-btn>
+                <v-btn
                   v-else-if="item.exists && item.taskType === 2 && !item.userClaimed && item.currentClaims < item.maxClaims"
                   size="small"
                   color="primary"
@@ -76,14 +93,23 @@
         <v-alert v-if="errorMsg" type="error" class="mt-4">{{ errorMsg }}</v-alert>
 
         <div v-if="selectedQRCodeTaskId !== null" class="mt-4">
-          <QRCodeGenerator :taskId="selectedQRCodeTaskId" />
+          <QRCodeGenerator :taskId="selectedQRCodeTaskId"></QRCodeGenerator>
           <v-btn color="secondary" class="mt-2" @click="selectedQRCodeTaskId = null">關閉 QR Code</v-btn>
         </div>
 
         <div v-if="scannerTaskId !== null" class="mt-4">
-          <QRCodeScanner />
+          <QRCodeScanner></QRCodeScanner>
           <v-btn color="secondary" class="mt-2" @click="scannerTaskId = null">關閉掃描器</v-btn>
         </div>
+
+        <SurveyAnswerDialog
+          v-if="selectedSurveyTask"
+          :modelValue="surveyDialogOpen"
+          :survey="selectedSurveyTask.survey"
+          :taskId="selectedSurveyTask.taskId"
+          @update:modelValue="surveyDialogOpen = $event"
+          @submitted="handleSurveySubmitted"
+        ></SurveyAnswerDialog>
       </div>
     </v-card>
   </v-container>
@@ -98,6 +124,7 @@ import taskRewardABI from '@/abi/TaskReward.json'
 import paymentABI from '@/abi/Payment.json'
 import QRCodeGenerator from '@/components/QRCodeGenerator.vue'
 import QRCodeScanner from '@/components/QRCodeScanner.vue'
+import SurveyAnswerDialog from '@/components/SurveyAnswerDialog.vue'
 
 const headers = ref([
   { title: '任務編號', key: 'taskId', width: '80px' },
@@ -115,6 +142,8 @@ const loading = ref(false)
 const claimingId = ref(null)
 const selectedQRCodeTaskId = ref(null)
 const scannerTaskId = ref(null)
+const surveyDialogOpen = ref(false)
+const selectedSurveyTask = ref(null)
 const successMsg = ref('')
 const errorMsg = ref('')
 
@@ -137,10 +166,14 @@ function getTaskStatusLabel(item) {
 
   if (item.canClaim) {
     if (item.taskType === 2) return '掃描領取'
+    if (item.taskType === 1) return '填寫問卷'
     return '可領取'
   }
 
   if (item.taskType === 0) return '尚未達標'
+  if (item.taskType === 1) {
+    return item.surveySubmitted ? '已填寫問卷' : '尚未填寫'
+  }
   if (item.taskType === 2) return '等待掃描'
   return '不可領'
 }
@@ -186,11 +219,39 @@ const loadTasks = async () => {
       // 新的 getTask 回傳順序: taskType[0], description[1], reward[2], maxClaims[3], currentClaims[4], targetAmount[5], createdBy[6], createdAt[7], exists[8]
       const [taskType, description, reward, maxClaims, currentClaims, targetAmount, createdBy, createdAt, exists] = task
       const numericTaskType = Number(taskType)
+      let displayDescription = description
+      let survey = null
+      if (numericTaskType === 1) {
+        try {
+          const parsed = JSON.parse(description)
+          if (parsed && parsed.questions) {
+            survey = parsed
+            displayDescription = parsed.title || parsed.description || description
+          }
+        } catch {
+          displayDescription = description
+        }
+      }
 
       // 過濾已取消的任務
       if (!exists) continue
 
       const userClaimed = await taskRewardContract.hasUserClaimed(i, userAddress)
+
+      // 檢查問卷是否已提交（僅對 Survey 任務）
+      let surveySubmitted = false
+      if (numericTaskType === 1) {
+        try {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+          const surveyResponse = await fetch(`${backendUrl}/api/student/${userAddress}/surveys`)
+          if (surveyResponse.ok) {
+            const surveyData = await surveyResponse.json()
+            surveySubmitted = surveyData.data.some(s => s.taskId === i)
+          }
+        } catch (error) {
+          console.warn('Failed to check survey submission:', error)
+        }
+      }
 
       // 對消費任務，查詢用戶的累積消費
       let userConsumption = BigInt(0)
@@ -203,12 +264,18 @@ const loadTasks = async () => {
       } else {
         // Survey 或 Event 類型
         canClaim = !userClaimed && currentClaims < maxClaims
+        if (numericTaskType === 1) {
+          // Survey 類型：需已提交問卷
+          canClaim = canClaim && surveySubmitted
+        }
       }
 
       taskList.push({
         taskId: i,
         taskType: numericTaskType,
         description,
+        displayDescription,
+        survey,
         reward,
         maxClaims: Number(maxClaims),
         currentClaims: Number(currentClaims),
@@ -218,6 +285,7 @@ const loadTasks = async () => {
         exists,
         userClaimed,
         userConsumption,
+        surveySubmitted,
         canClaim,
       })
     }
@@ -259,9 +327,21 @@ const claimTask = async (taskId) => {
   }
 }
 
+function openSurvey(item) {
+  selectedSurveyTask.value = item
+  surveyDialogOpen.value = true
+}
+
+async function handleSurveySubmitted(payload) {
+  if (!payload || payload.taskId === undefined) return
+  successMsg.value = `✅ 問卷已提交，正在領取任務 #${payload.taskId} 的獎勵...`
+  await claimTask(payload.taskId)
+}
+
 function showQRCode(taskId) {
   selectedQRCodeTaskId.value = taskId
 }
 
 onMounted(loadTasks)
 </script>
+
