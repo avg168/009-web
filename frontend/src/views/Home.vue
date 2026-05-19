@@ -15,7 +15,7 @@
                   <v-row align="center" no-gutters>
                     <v-icon color="error" icon="mdi-alpha-t-box" size="55"></v-icon>
                     <v-col class="text-h3" cols="8">
-                      {{ mtkBalance/10**18 }}
+                      {{ mtkBalance }}
                     </v-col>
                   </v-row>
                   <v-card-item>
@@ -41,7 +41,7 @@
                 <v-card-item>
                   <v-card-title>
                     <v-icon color="error" icon="mdi-alpha-t-box"></v-icon>
-                    <span>MTK交易總額: {{ walletStore.getTotalMTKSpent()/10**18 }} MTK</span>
+                    <span>MTK交易總額: {{ walletStore.getTotalMTKSpent() }} MTK</span>
                 </v-card-title>
 
                 <v-card-subtitle>
