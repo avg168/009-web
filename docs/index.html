@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f49c16"><meta name="description" content="009 會員服務平台測試版">
+<title>009｜會員服務平台</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#292314;background:#fff8ed;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.48;cursor:not-allowed}a{color:#955600}header{background:linear-gradient(115deg,#ffbf47,#f08b12);padding:18px max(18px,calc((100vw - 1000px)/2));color:#412800;display:flex;align-items:center;justify-content:space-between;gap:12px}header b{font-size:1.45rem;letter-spacing:.02em}header small{display:block;font-weight:500;margin-top:4px}header .brand{display:flex;align-items:center;gap:12px}.logo{display:grid;place-items:center;min-width:42px;height:42px;border-radius:13px;background:#fff5d9;font-size:1.3rem;font-weight:900}main{max-width:1000px;margin:20px auto;padding:0 15px 55px}.hero,.panel,.tile,.notice{background:white;border:1px solid #f1dfba;box-shadow:0 3px 13px #895e120d;border-radius:17px;padding:20px;margin-bottom:16px}.hero{background:linear-gradient(135deg,#fff2cc,#fff);padding:25px}.eyebrow{color:#905d00;font-size:.85rem;font-weight:700}.hero h1{margin:9px 0;font-size:clamp(1.5rem,4.8vw,2.35rem)}.hero p{line-height:1.7;color:#665847;margin:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px}.tile{margin:0;padding:17px}.tile b{font-size:1.5rem;display:block;margin-top:5px;overflow-wrap:anywhere}.tile small,.muted{color:#81725e}.panel h2{font-size:1.12rem;margin:0 0 16px}.tabs{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}.tabs button{border:1px solid #f2d8a8;background:#fff;border-radius:100px;padding:9px 12px}.tabs button.active{background:#975900;color:#fff;border-color:#975900}.primary,.secondary{border:0;border-radius:10px;padding:11px 16px;font-weight:700}.primary{background:#dc7c00;color:#fff}.secondary{background:#fff0d3;color:#693d00}.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.form label{display:block;font-size:.9rem;font-weight:650;margin:10px 0 5px}.form input{width:100%;border:1px solid #dbcaa7;padding:11px 12px;border-radius:10px;min-height:42px}.form button{margin-top:14px;width:100%}.notice{background:#fff5dc;border-color:#efd69c;font-size:.93rem;line-height:1.65}.error{border-color:#eca7a7;background:#fff0ef;color:#8b2121}.success{border-color:#a3cda7;background:#eef9ee;color:#215c2d}.hidden{display:none!important}.item{padding:12px 0;border-bottom:1px solid #f2ece1;display:flex;justify-content:space-between;gap:12px}.item:last-child{border:0}.item strong{overflow-wrap:anywhere}.item small{color:#85735a;display:block;margin-top:5px}.number{font-weight:750;white-space:nowrap;text-align:right}.tag{padding:3px 8px;border-radius:20px;background:#fff0ce;color:#7d4b00;font-size:.78rem}.feature{line-height:1.75}footer{color:#7a6f5e;text-align:center;font-size:.8rem;line-height:1.6;padding:0 16px 24px}code{overflow-wrap:anywhere;color:#925200}#feedback{position:sticky;top:0;z-index:10}button:focus-visible,input:focus-visible{outline:3px solid #764b00;outline-offset:2px}@media(max-width:570px){header{padding:12px 15px}header b{font-size:1.1rem}.hero,.panel{padding:16px}.item{font-size:.88rem}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span class="logo">009</span><div><b>009 會員服務平台</b><small>消費紀錄・權益查詢・服務連結</small></div></div><button id="logout" class="secondary hidden" type="button">登出</button></header>
+<div id="feedback" class="notice hidden" role="status" aria-live="polite"></div>
+<main>
+<section class="hero"><span class="eyebrow">009 MEMBER PORTAL · v0.1</span><h1>從消費開始，清楚掌握自己的會員紀錄</h1><p>會員登入後，可查詢消費紀錄、CV 異動、L-VVIP 點位及各類回饋。各項數值以平台核實、登錄的資料為準，不代表保證獲利或可立即兌現。</p></section>
+<section id="setup" class="notice hidden"><b>尚未連接會員資料庫</b><p>此頁面已可預覽，但註冊與查詢功能尚未啟用。管理者須完成 Supabase SQL 建表，並在本檔案填入 Project URL 與 publishable／anon key。請勿填入 service_role 或 secret key。</p></section>
+<section id="guest">
+<div class="forms"><div class="panel form"><h2>會員登入</h2><form id="login-form"><label for="login-email">電子郵件</label><input id="login-email" type="email" autocomplete="email" required><label for="login-password">密碼</label><input id="login-password" type="password" autocomplete="current-password" required><button class="primary" type="submit">登入會員中心</button></form></div>
+<div class="panel form"><h2>免費註冊</h2><form id="signup-form"><label for="signup-name">顯示名稱</label><input id="signup-name" type="text" maxlength="80" autocomplete="name" required><label for="signup-email">電子郵件</label><input id="signup-email" type="email" autocomplete="email" required><label for="signup-password">設定密碼（至少 8 碼）</label><input id="signup-password" type="password" minlength="8" autocomplete="new-password" required><label for="signup-inviter">邀請碼（選填）</label><input id="signup-inviter" type="text" maxlength="32"><button class="primary" type="submit">註冊會員</button></form></div></div>
+<div class="panel feature"><h2>會員中心提供哪些服務？</h2><div class="grid"><div><b>消費資產紀錄</b><p class="muted">查看已登錄訂單、消費與相關回饋記錄。</p></div><div><b>CV 紀錄</b><p class="muted">查詢個人 CV 餘額及每筆異動來源。</p></div><div><b>L-VVIP 點位</b><p class="muted">查看個人序號、級別及目前狀態。</p></div><div><b>回饋明細</b><p class="muted">依不同單位分別顯示，不混算金額。</p></div></div></div>
+</section>
+<section id="member" class="hidden"><div class="panel"><div class="inline" style="justify-content:space-between"><div><h2 id="hello">會員中心</h2><div class="muted" id="member-email"></div></div><button class="secondary" id="refresh" type="button">重新整理</button></div><p class="muted">我的邀請碼：<strong id="ref-code">—</strong></p><div class="inline"><button class="secondary" id="copy-ref" type="button">複製邀請連結</button><span class="tag" id="member-status">—</span></div></div>
+<div class="grid"><div class="tile"><small>CV 目前紀錄餘額</small><b id="cv-total">—</b></div><div class="tile"><small>credit 紀錄餘額</small><b id="credit-total">—</b></div><div class="tile"><small>P 點紀錄餘額</small><b id="p-total">—</b></div><div class="tile"><small>RC 紀錄餘額</small><b id="rc-total">—</b></div><div class="tile"><small>已付款訂單筆數</small><b id="order-total">—</b></div><div class="tile"><small>有效 L-VVIP 點位</small><b id="lv-total">—</b></div><div class="tile"><small>可用兌換券張數</small><b id="voucher-total">—</b></div></div>
+<div class="tabs" role="tablist" aria-label="會員功能"><button class="active" type="button" data-tab="orders">消費紀錄</button><button type="button" data-tab="cv">CV 明細</button><button type="button" data-tab="lv">L-VVIP</button><button type="button" data-tab="rebate">回饋紀錄</button><button type="button" data-tab="vouchers">兌換券</button></div>
+<div class="panel"><h2 id="section-title">消費紀錄</h2><div id="section-content" aria-live="polite">載入中…</div></div><div class="notice">本版只顯示已記錄的個人資料。CV 發放、點位分配、回饋結算、兌換券核銷及轉帳均須由經授權的後端完成；本版未提供任何自動收益或領款功能。</div></section>
+</main><footer>009 會員服務平台｜測試版 v0.1<br>正式營運前須完成制度確認、安全審查、資料保護與交易流程驗證。</footer>
+<script type="module">
+// ↓ 唯二必填設定：從 Supabase 專案的 Settings → API Keys 取得。
+// Project URL 例：https://xxxxxxxx.supabase.co
+// publishable / anon key 可以在前端使用；絕不可放 service_role 或 secret key。
+const SUPABASE_URL = '在這裡填入_SUPABASE_PROJECT_URL'
+const SUPABASE_PUBLISHABLE_KEY = '在這裡填入_SUPABASE_PUBLISHABLE_OR_ANON_KEY'
+
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+const $ = id => document.getElementById(id)
+const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL) && !SUPABASE_PUBLISHABLE_KEY.includes('在這裡填入_')
+const client = configured ? createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY) : null
+let currentUser = null, profile = null, activeTab = 'orders', dataSets = {}
+const tabMap = {orders:['消費紀錄','member_orders'],cv:['CV 明細','cv_ledger'],lv:['L-VVIP 點位','lv_positions'],rebate:['回饋紀錄','rebate_ledger'],vouchers:['兌換券','member_vouchers']}
+const safe = value => String(value ?? '').replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))
+const fmt = n => Number(n ?? 0).toLocaleString('zh-TW',{maximumFractionDigits:4})
+const date = value => value ? new Date(value).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}) : '—'
+function feedback(message,type=''){const el=$('feedback');el.textContent=message;el.className='notice'+(type?' '+type:'');el.classList.remove('hidden')}
+function clearFeedback(){$('feedback').classList.add('hidden')}
+function setBusy(form,busy){form.querySelectorAll('button,input').forEach(el=>el.disabled=busy)}
+function showMember(isMember){$('guest').classList.toggle('hidden',isMember);$('member').classList.toggle('hidden',!isMember);$('logout').classList.toggle('hidden',!isMember)}
+function errorText(e){return e?.message || '操作失敗，請稍後再試。'}
+function displayRows(){
+ const entries=dataSets[activeTab] || []; $('section-title').textContent=tabMap[activeTab][0];
+ if(!entries.length){$('section-content').innerHTML='<p class="muted">目前尚無資料。新增或確認資料後再重新整理。</p>';return}
+ $('section-content').innerHTML=entries.map(x=>{
+ let heading='',desc='',amount='';
+ if(activeTab==='orders'){heading=x.description;desc=`訂單 ${x.order_ref} · ${x.status}`;amount=`NT$ ${fmt(x.paid_amount)}`}
+ if(activeTab==='cv'){heading=x.description||x.entry_type;desc=`${x.entry_type}${x.reference_id?' · '+x.reference_id:''}`;amount=`${Number(x.delta)>0?'+':''}${fmt(x.delta)} CV`}
+ if(activeTab==='rebate'){heading=x.description||x.entry_type;desc=`${x.entry_type}${x.reference_id?' · '+x.reference_id:''}`;amount=`${Number(x.delta)>0?'+':''}${fmt(x.delta)} ${x.unit}`}
+ if(activeTab==='lv'){heading=`序號 ${x.position_ref}`;desc=x.description||`狀態：${x.status}`;amount=`${x.tier ?? '—'} 級 · ${x.status}`}
+ if(activeTab==='vouchers'){heading=x.service_name;desc=`票券 ${x.voucher_code} · ${x.status}${x.expires_at?' · 到期 '+date(x.expires_at):''}`;amount=x.status}
+ return `<div class="item"><div><strong>${safe(heading)}</strong><small>${safe(desc)}</small><small>${safe(date(x.created_at))}</small></div><div class="number">${safe(amount)}</div></div>`
+ }).join('')
+}
+async function loadMember(){
+ if(!currentUser || !client) return;
+ try{
+  $('section-content').textContent='資料載入中…';
+  const [{data:p,error:pe},{data:s,error:se},...rows]=await Promise.all([
+   client.from('member_profiles').select('id,display_name,referral_code,status').eq('id',currentUser.id).single(),
+   client.rpc('my_009_summary'),
+   ...Object.entries(tabMap).map(([,v])=>client.from(v[1]).select('*').eq('member_id',currentUser.id).order('created_at',{ascending:false}).limit(50))
+  ]);
+  if(pe)throw pe;if(se)throw se;
+  profile=p;$('hello').textContent=`您好，${p.display_name}`;$('member-email').textContent=currentUser.email||'';
+  $('ref-code').textContent=p.referral_code;$('member-status').textContent=p.status==='active'?'會員資料已建立':'帳號狀態：'+p.status;
+  $('cv-total').textContent=fmt(s.cv);$('credit-total').textContent=fmt(s.credit);$('p-total').textContent=fmt(s.p);$('rc-total').textContent=fmt(s.rc);
+  $('order-total').textContent=fmt(s.orders);$('lv-total').textContent=fmt(s.lv_active);$('voucher-total').textContent=fmt(s.vouchers);
+  dataSets={};Object.keys(tabMap).forEach((key,i)=>{if(rows[i].error)throw rows[i].error;dataSets[key]=rows[i].data||[]});
+  displayRows();clearFeedback();
+ }catch(e){feedback('查詢失敗：'+errorText(e)+'。請確認已執行 schema.sql 並啟用資料表權限。','error');$('section-content').textContent='目前無法讀取資料。'}
+}
+async function establishSession(){if(!client){$('setup').classList.remove('hidden');showMember(false);return}const {data:{user},error}=await client.auth.getUser();if(error && user)feedback(errorText(error),'error');currentUser=user;showMember(!!user);if(user)await loadMember()}
+$('login-form').addEventListener('submit',async event=>{event.preventDefault();if(!client)return feedback('請先完成會員資料庫設定。','error');const f=event.currentTarget;setBusy(f,true);try{const {error}=await client.auth.signInWithPassword({email:$('login-email').value.trim(),password:$('login-password').value});if(error)throw error;await establishSession();f.reset()}catch(e){feedback('登入失敗：'+errorText(e),'error')}finally{setBusy(f,false)}})
+$('signup-form').addEventListener('submit',async event=>{event.preventDefault();if(!client)return feedback('請先完成會員資料庫設定。','error');const f=event.currentTarget;setBusy(f,true);try{
+ const {error,data}=await client.auth.signUp({email:$('signup-email').value.trim(),password:$('signup-password').value,options:{emailRedirectTo:location.origin+location.pathname,data:{display_name:$('signup-name').value.trim(),inviter_code:$('signup-inviter').value.trim()}}});if(error)throw error;
+ if(data.session){await establishSession();feedback('註冊完成，已登入會員中心。','success')}else feedback('註冊資料已送出。請依電子郵件中的驗證信完成驗證，再回來登入。','success');f.reset()
+ }catch(e){feedback('註冊失敗：'+errorText(e),'error')}finally{setBusy(f,false)}})
+$('logout').addEventListener('click',async()=>{if(!client)return;const {error}=await client.auth.signOut();if(error)return feedback(errorText(error),'error');currentUser=null;profile=null;dataSets={};showMember(false);feedback('已登出。','success')})
+$('refresh').addEventListener('click',loadMember)
+for(const button of document.querySelectorAll('[data-tab]'))button.addEventListener('click',()=>{activeTab=button.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===button));displayRows()})
+$('copy-ref').addEventListener('click',async()=>{if(!profile)return;const url=new URL(location.href);url.searchParams.set('ref',profile.referral_code);url.hash='';try{await navigator.clipboard.writeText(url.href);feedback('已複製邀請連結。','success')}catch{feedback('無法自動複製，請改用瀏覽器分享連結。','error')}})
+const invite=new URLSearchParams(location.search).get('ref');if(invite && /^[\w-]{1,32}$/.test(invite))$('signup-inviter').value=invite;
+if(client){client.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'){currentUser=null;showMember(false)}})}
+establishSession();
+</script>
+</body>
+</html>
