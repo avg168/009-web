@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101e2f">
+<title>IPT Sepolia 部署工具 V1.3｜自動加入／切換 Sepolia</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#182432;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}main{max-width:720px;margin:auto;padding:18px 15px 70px}header{background:#101e2f;color:white;padding:24px 18px;border-radius:0 0 18px 18px}h1{font-size:1.4rem;margin:0 0 8px}h2{font-size:1.05rem;margin:0 0 12px}p{line-height:1.65;margin:8px 0}.sub{font-size:.85rem;color:#5c6878}.headsub{color:#dce8ff;font-size:.9rem}section{background:white;border:1px solid #dae0eb;border-radius:14px;padding:16px;margin:16px 0;box-shadow:0 2px 10px #10203a08}.pill{display:inline-block;color:#05573f;background:#d6f9e9;border-radius:40px;padding:5px 9px;font-size:.78rem;font-weight:bold}.warn{background:#fff3d9;border-left:4px solid #d3910c;padding:10px 12px;border-radius:8px}.danger{background:#fff0f0;border-left:4px solid #c82727;padding:10px 12px;border-radius:8px}.ok{background:#e8faee;border-left:4px solid #19834f;padding:10px 12px;border-radius:8px}label{display:block;font-weight:650;margin:13px 0 6px}input[type=text]{display:block;width:100%;font:inherit;font-size:.93rem;padding:13px 11px;border:1px solid #b9c4d6;border-radius:9px;min-width:0}button{font:inherit;font-weight:700;padding:13px 16px;border:0;border-radius:10px;background:#1763dc;color:white;width:100%;margin:9px 0;cursor:pointer}button.secondary{background:#e7edf7;color:#17365c}button:disabled{opacity:.5;cursor:not-allowed}code,.addr{overflow-wrap:anywhere;word-break:break-word;font: .87rem ui-monospace,monospace}.line{padding:6px 0;border-bottom:1px solid #eef0f3}.muted{color:#647184}a{color:#075bba}#log{white-space:pre-wrap;overflow-wrap:anywhere;font: .83rem ui-monospace,monospace;background:#e8eef5;padding:12px;border-radius:9px;min-height:62px}input[type=checkbox]{width:21px;height:21px;vertical-align:middle;margin-right:8px}#txDetails{display:none}#txLink{display:block;overflow-wrap:anywhere}#contractLink{display:block;overflow-wrap:anywhere}.summary{padding:10px;background:#f3f6fa;border-radius:8px}
+</style>
+</head>
+<body><header><h1>IPT｜Sepolia 專用部署</h1><div class="headsub">V1.3・Android 手機・Trust Wallet・自動加入／切換 Sepolia</div></header>
+<main>
+<section><span class="pill">V1.3・自動加入／切換 Sepolia・不需重新編譯</span><h2 style="margin-top:12px">開始前，請先確認</h2>
+<p class="warn">這是 Ethereum <strong>Sepolia 測試網</strong>工具，請勿投入真實 ETH。必須在 <strong>Trust Wallet 的 DApp 瀏覽器</strong>中開啟正式 HTTPS 網址。網頁不會要求助記詞、私鑰或 Google／Email 登入。</p>
+<div class="line"><strong>預設部署錢包</strong><div class="addr" id="expectedDeployer"></div></div>
+<div class="line"><strong>目標網路</strong><div>Ethereum Sepolia（Chain ID 11155111）</div></div>
+<div class="line"><strong>原始編譯 BIN SHA-256</strong><div class="addr" id="bytecodeHash"></div></div>
+<p class="sub">這些 ABI、BIN 由使用者先前下載的 GitHub Actions 壓縮檔直接嵌入；尚未對 Solidity 原始碼做獨立安全稽核。</p>
+</section>
+<section><h2>步驟 1｜連線 Trust Wallet</h2>
+<div id="providerStatus" class="warn">正在尋找手機錢包連線介面……</div>
+<button id="connect">連接錢包（僅授權查看帳戶）</button>
+<div id="connectFeedback" role="status" aria-live="polite" class="warn">等待連線。點選上方按鈕後，這裡會立即顯示進度或錯誤；不必捲到網頁最下方。</div>
+<div class="line">目前帳戶：<div id="connectedAddress" class="addr muted">尚未連線</div></div>
+<div class="line">目前網路：<span id="chainDisplay">尚未確認</span></div>
+<div class="line">Sepolia 餘額：<span id="balanceDisplay">尚未查詢</span></div>
+<button id="switch" class="secondary">自動切換／加入 Ethereum Sepolia</button>
+<button id="refresh" class="secondary">更新網路與測試 ETH 餘額</button>
+<p class="sub">V1.3 會先嘗試切換 Sepolia；若錢包回報尚未加入該網路，才會以 EIP-3085 要求新增 Sepolia，並優先使用已知可用的公開 RPC。若 Trust Wallet 顯示安全警告或拒絕新增，請停止，不要繞過警告。</p>
+</section>
+<section><h2>步驟 2｜設定合約管理者</h2>
+<p>請從 <strong>IPT Sepolia Test Wallet</strong> 的「接收 Ethereum」複製完整公開地址，再貼在此處。<strong>不要貼部署錢包地址、私鑰或助記詞。</strong></p>
+<label for="owner">管理者公開地址（必須是完整的 0x + 40 個十六進位字元）</label>
+<input id="owner" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="0x…（請從管理者錢包重新複製）" maxlength="42" />
+<p class="sub">這個地址會作為建構子 <code>initialOwner</code>。請與 GitHub 的 <code>IPT_OWNER_ADDRESS</code> 比對；兩者若不同，請先停止，不要部署。</p>
+<div class="summary"><div class="line">合約名稱：Independent Points</div><div class="line">代幣符號：IPT</div><div class="line">建構子參數：initialOwner（管理者地址）</div><div class="line">部署交易 value：0 ETH（僅支付測試網 Gas）</div></div>
+</section>
+<section><h2>步驟 3｜預估 Gas 與部署</h2>
+<button id="estimate" class="secondary">檢查錢包、管理者地址並預估 Gas</button>
+<div id="txDetails" class="summary"><div id="gasDisplay" class="line"></div><div id="costDisplay" class="line"></div><div id="ownerDisplay" class="line addr"></div><div class="line">確認接收者：建立新合約（無收款地址），傳送 0 ETH。</div></div>
+<label><input type="checkbox" id="agree"/>我已逐字確認管理者、部署錢包、Sepolia 網路及測試 Gas 費用；了解部署不可逆。</label>
+<button id="deploy" disabled>由 Trust Wallet 確認部署交易</button>
+<p class="danger">部署時，錢包只應出現「建立合約」交易，網路須是 Sepolia。若顯示其他地址、其他網路或要求轉出真實資產，請拒絕。</p>
+</section>
+<section><h2>交易結果</h2><div id="log" aria-live="polite">尚未傳送交易。</div>
+<div id="txLink"></div><div id="contractLink"></div>
+<p class="sub">簽署之後若手機切換 App、網頁中斷或長時間等待，可使用交易雜湊在 Sepolia Etherscan 查詢，不要重複送出相同部署交易。</p></section>
+</main>
+<script>
+'use strict';
+const ABI = [{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"uint256","name":"increasedSupply","type":"uint256"},{"internalType":"uint256","name":"cap","type":"uint256"}],"name":"ERC20ExceededCap","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"allowance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientAllowance","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC20InvalidApprover","type":"error"},{"inputs":[{"internalType":"uint256","name":"cap","type":"uint256"}],"name":"ERC20InvalidCap","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC20InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC20InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"}],"name":"ERC20InvalidSpender","type":"error"},{"inputs":[],"name":"EnforcedPause","type":"error"},{"inputs":[],"name":"ExpectedPause","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},{"inputs":[],"name":"MAX_POINTS","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"units","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"cap","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"pure","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"units","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+const BYTECODE = '0x60a060405234801562000010575f80fd5b506040516200204b3803806200204b833981810160405281019062000036919062000333565b806064633b9aca006200004a919062000399565b6040518060400160405280601281526020017f496e646570656e64656e7420506f696e747300000000000000000000000000008152506040518060400160405280600381526020017f49505400000000000000000000000000000000000000000000000000000000008152508160039081620000c791906200063e565b508060049081620000d991906200063e565b5050505f810362000123575f6040517f392e1e270000000000000000000000000000000000000000000000000000000081526004016200011a919062000763565b60405180910390fd5b8060808181525050505f60055f6101000a81548160ff0219169083151502179055505f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603620001b8575f6040517f1e4fbdf7000000000000000000000000000000000000000000000000000000008152600401620001af91906200078f565b60405180910390fd5b620001c981620001d160201b60201c565b5050620007aa565b60065f6101000a81549073ffffffffffffffffffffffffffffffffffffffff021916905562000206816200020960201b60201c565b50565b5f600560019054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905081600560016101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f80fd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f620002fd82620002d2565b9050919050565b6200030f81620002f1565b81146200031a575f80fd5b50565b5f815190506200032d8162000304565b92915050565b5f602082840312156200034b576200034a620002ce565b5b5f6200035a848285016200031d565b91505092915050565b5f819050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f620003a58262000363565b9150620003b28362000363565b9250828202620003c28162000363565b91508282048414831517620003dc57620003db6200036c565b5b5092915050565b5f81519050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806200045f57607f821691505b6020821081036200047557620004746200041a565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f60088302620004d97fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff826200049c565b620004e586836200049c565b95508019841693508086168417925050509392505050565b5f819050919050565b5f62000526620005206200051a8462000363565b620004fd565b62000363565b9050919050565b5f819050919050565b620005418362000506565b6200055962000550826200052d565b848454620004a8565b825550505050565b5f90565b6200056f62000561565b6200057c81848462000536565b505050565b5b81811015620005a357620005975f8262000565565b60018101905062000582565b5050565b601f821115620005f257620005bc816200047b565b620005c7846200048d565b81016020851015620005d7578190505b620005ef620005e6856200048d565b83018262000581565b50505b505050565b5f82821c905092915050565b5f620006145f1984600802620005f7565b1980831691505092915050565b5f6200062e838362000603565b9150826002028217905092915050565b6200064982620003e3565b67ffffffffffffffff811115620006655762000664620003ed565b5b62000671825462000447565b6200067e828285620005a7565b5f60209050601f831160018114620006b4575f84156200069f578287015190505b620006ab858262000621565b8655506200071a565b601f198416620006c4866200047b565b5f5b82811015620006ed57848901518255600182019150602085019450602081019050620006c6565b868310156200070d578489015162000709601f89168262000603565b8355505b6001600288020188555050505b505050505050565b5f819050919050565b5f6200074b620007456200073f8462000722565b620004fd565b62000363565b9050919050565b6200075d816200072b565b82525050565b5f602082019050620007785f83018462000752565b92915050565b6200078981620002f1565b82525050565b5f602082019050620007a45f8301846200077e565b92915050565b608051611888620007c35f395f6104af01526118885ff3fe608060405234801561000f575f80fd5b5060043610610135575f3560e01c80635c975abb116100b65780638da5cb5b1161007a5780638da5cb5b146102dd57806395d89b41146102fb578063a9059cbb14610319578063dd62ed3e14610349578063e30c397814610379578063f2fde38b1461039757610135565b80635c975abb1461027157806370a082311461028f578063715018a6146102bf57806379ba5097146102c95780638456cb59146102d357610135565b8063313ce567116100fd578063313ce567146101f3578063355274ea146102115780633f4ba83a1461022f57806340c10f191461023957806342966c681461025557610135565b806306fdde0314610139578063095ea7b31461015757806318160ddd1461018757806323b872dd146101a557806325f87d23146101d5575b5f80fd5b6101416103b3565b60405161014e91906113df565b60405180910390f35b610171600480360381019061016c9190611490565b610443565b60405161017e91906114e8565b60405180910390f35b61018f610465565b60405161019c9190611510565b60405180910390f35b6101bf60048036038101906101ba9190611529565b61046e565b6040516101cc91906114e8565b60405180910390f35b6101dd61049c565b6040516101ea9190611510565b60405180910390f35b6101fb6104a4565b6040516102089190611594565b60405180910390f35b6102196104ac565b6040516102269190611510565b60405180910390f35b6102376104d3565b005b610253600480360381019061024e9190611490565b6104e5565b005b61026f600480360381019061026a91906115ad565b6105b3565b005b61027961060a565b60405161028691906114e8565b60405180910390f35b6102a960048036038101906102a491906115d8565b61061f565b6040516102b69190611510565b60405180910390f35b6102c7610664565b005b6102d1610677565b005b6102db610705565b005b6102e5610717565b6040516102f29190611612565b60405180910390f35b610303610740565b60405161031091906113df565b60405180910390f35b610333600480360381019061032e9190611490565b6107d0565b60405161034091906114e8565b60405180910390f35b610363600480360381019061035e919061162b565b6107f2565b6040516103709190611510565b60405180910390f35b610381610874565b60405161038e9190611612565b60405180910390f35b6103b160048036038101906103ac91906115d8565b61089c565b005b6060600380546103c290611696565b80601f01602080910402602001604051908101604052809291908181526020018280546103ee90611696565b80156104395780601f1061041057610100808354040283529160200191610439565b820191905f5260205f20905b81548152906001019060200180831161041c57829003601f168201915b5050505050905090565b5f8061044d610948565b905061045a81858561094f565b600191505092915050565b5f600254905090565b5f80610478610948565b9050610485858285610961565b6104908585856109f4565b60019150509392505050565b633b9aca0081565b5f6002905090565b5f7f0000000000000000000000000000000000000000000000000000000000000000905090565b6104db610ae4565b6104e3610b6b565b565b6104ed610ae4565b6104f5610bcc565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603610563576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161055a90611710565b60405180910390fd5b5f81116105a5576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161059c90611778565b60405180910390fd5b6105af8282610c0d565b5050565b6105bb610bcc565b5f81116105fd576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016105f490611778565b60405180910390fd5b6106073382610c8c565b50565b5f60055f9054906101000a900460ff16905090565b5f805f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f20549050919050565b61066c610ae4565b6106755f610d0b565b565b5f610680610948565b90508073ffffffffffffffffffffffffffffffffffffffff166106a1610874565b73ffffffffffffffffffffffffffffffffffffffff16146106f957806040517f118cdaa70000000000000000000000000000000000000000000000000000000081526004016106f09190611612565b60405180910390fd5b61070281610d0b565b50565b61070d610ae4565b610715610d3b565b565b5f600560019054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b60606004805461074f90611696565b80601f016020809104026020016040519081016040528092919081815260200182805461077b90611696565b80156107c65780601f1061079d576101008083540402835291602001916107c6565b820191905f5260205f20905b8154815290600101906020018083116107a957829003601f168201915b5050505050905090565b5f806107da610948565b90506107e78185856109f4565b600191505092915050565b5f60015f8473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f2054905092915050565b5f60065f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6108a4610ae4565b8060065f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508073ffffffffffffffffffffffffffffffffffffffff16610903610717565b73ffffffffffffffffffffffffffffffffffffffff167f38d16b8cac22d99fc7c124b9cd0de2d3fa1faef420bfe791d8c362d765e2270060405160405180910390a350565b5f33905090565b61095c8383836001610d9d565b505050565b5f61096c84846107f2565b90507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8110156109ee57818110156109df578281836040517ffb8f41b20000000000000000000000000000000000000000000000000000000081526004016109d693929190611796565b60405180910390fd5b6109ed84848484035f610d9d565b5b50505050565b5f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff1603610a64575f6040517f96c6fd1e000000000000000000000000000000000000000000000000000000008152600401610a5b9190611612565b60405180910390fd5b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603610ad4575f6040517fec442f05000000000000000000000000000000000000000000000000000000008152600401610acb9190611612565b60405180910390fd5b610adf838383610f6c565b505050565b610aec610948565b73ffffffffffffffffffffffffffffffffffffffff16610b0a610717565b73ffffffffffffffffffffffffffffffffffffffff1614610b6957610b2d610948565b6040517f118cdaa7000000000000000000000000000000000000000000000000000000008152600401610b609190611612565b60405180910390fd5b565b610b73610f7c565b5f60055f6101000a81548160ff0219169083151502179055507f5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa610bb5610948565b604051610bc29190611612565b60405180910390a1565b610bd461060a565b15610c0b576040517fd93c066500000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603610c7d575f6040517fec442f05000000000000000000000000000000000000000000000000000000008152600401610c749190611612565b60405180910390fd5b610c885f8383610f6c565b5050565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603610cfc575f6040517f96c6fd1e000000000000000000000000000000000000000000000000000000008152600401610cf39190611612565b60405180910390fd5b610d07825f83610f6c565b5050565b60065f6101000a81549073ffffffffffffffffffffffffffffffffffffffff0219169055610d3881610fbc565b50565b610d43610bcc565b600160055f6101000a81548160ff0219169083151502179055507f62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258610d86610948565b604051610d939190611612565b60405180910390a1565b5f73ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff1603610e0d575f6040517fe602df05000000000000000000000000000000000000000000000000000000008152600401610e049190611612565b60405180910390fd5b5f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff1603610e7d575f6040517f94280d62000000000000000000000000000000000000000000000000000000008152600401610e749190611612565b60405180910390fd5b8160015f8673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f8573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f20819055508015610f66578273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b92584604051610f5d9190611510565b60405180910390a35b50505050565b610f77838383611081565b505050565b610f8461060a565b610fba576040517f8dfc202b00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b565b5f600560019054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905081600560016101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b611089610bcc565b611094838383611099565b505050565b6110a483838361113c565b5f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff1603611137575f6110e06104ac565b90505f6110eb610465565b9050818111156111345780826040517f9e79f85400000000000000000000000000000000000000000000000000000000815260040161112b9291906117cb565b60405180910390fd5b50505b505050565b5f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff160361118c578060025f828254611180919061181f565b9250508190555061125a565b5f805f8573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f2054905081811015611215578381836040517fe450d38c00000000000000000000000000000000000000000000000000000000815260040161120c93929190611796565b60405180910390fd5b8181035f808673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f2081905550505b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff16036112a1578060025f82825403925050819055506112eb565b805f808473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f82825401925050819055505b8173ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516113489190611510565b60405180910390a3505050565b5f81519050919050565b5f82825260208201905092915050565b5f5b8381101561138c578082015181840152602081019050611371565b5f8484015250505050565b5f601f19601f8301169050919050565b5f6113b182611355565b6113bb818561135f565b93506113cb81856020860161136f565b6113d481611397565b840191505092915050565b5f6020820190508181035f8301526113f781846113a7565b905092915050565b5f80fd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61142c82611403565b9050919050565b61143c81611422565b8114611446575f80fd5b50565b5f8135905061145781611433565b92915050565b5f819050919050565b61146f8161145d565b8114611479575f80fd5b50565b5f8135905061148a81611466565b92915050565b5f80604083850312156114a6576114a56113ff565b5b5f6114b385828601611449565b92505060206114c48582860161147c565b9150509250929050565b5f8115159050919050565b6114e2816114ce565b82525050565b5f6020820190506114fb5f8301846114d9565b92915050565b61150a8161145d565b82525050565b5f6020820190506115235f830184611501565b92915050565b5f805f606084860312156115405761153f6113ff565b5b5f61154d86828701611449565b935050602061155e86828701611449565b925050604061156f8682870161147c565b9150509250925092565b5f60ff82169050919050565b61158e81611579565b82525050565b5f6020820190506115a75f830184611585565b92915050565b5f602082840312156115c2576115c16113ff565b5b5f6115cf8482850161147c565b91505092915050565b5f602082840312156115ed576115ec6113ff565b5b5f6115fa84828501611449565b91505092915050565b61160c81611422565b82525050565b5f6020820190506116255f830184611603565b92915050565b5f8060408385031215611641576116406113ff565b5b5f61164e85828601611449565b925050602061165f85828601611449565b9150509250929050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806116ad57607f821691505b6020821081036116c0576116bf611669565b5b50919050565b7f496e76616c696420726563697069656e740000000000000000000000000000005f82015250565b5f6116fa60118361135f565b9150611705826116c6565b602082019050919050565b5f6020820190508181035f830152611727816116ee565b9050919050565b7f416d6f756e74206d75737420626520706f7369746976650000000000000000005f82015250565b5f61176260178361135f565b915061176d8261172e565b602082019050919050565b5f6020820190508181035f83015261178f81611756565b9050919050565b5f6060820190506117a95f830186611603565b6117b66020830185611501565b6117c36040830184611501565b949350505050565b5f6040820190506117de5f830185611501565b6117eb6020830184611501565b9392505050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f6118298261145d565b91506118348361145d565b925082820190508082111561184c5761184b6117f2565b5b9291505056fea2646970667358221220f802425cdcc5b9aaa2fadc04462919b1a9850644733c4d8e7433b84fab45f3cb64736f6c63430008180033';
+const BIN_SHA256 = '9bc78eeeb7771e45bb44b00153c3b9608d2e5ded3ac42111b0d5525a91d90984';
+const EXPECTED_DEPLOYER = '0x09997702F8D33DFb538819E0520908b16B9A29d6';
+const CHAIN_ID = '0xaa36a7';
+const EXPLORER='https://sepolia.etherscan.io';
+const SEPOLIA_RPCS=[
+  'https://ethereum-sepolia-rpc.publicnode.com',
+  'https://rpc.sepolia.ethpandaops.io',
+  'https://sepolia.gateway.tenderly.co'
+];
+const SEPOLIA_ADD_PARAMS={
+  chainId:CHAIN_ID,
+  chainName:'Ethereum Sepolia',
+  nativeCurrency:{name:'Sepolia Ether',symbol:'ETH',decimals:18},
+  rpcUrls:SEPOLIA_RPCS,
+  blockExplorerUrls:[EXPLORER]
+};
+const $=id=>document.getElementById(id);
+let provider=null, currentAccount='', chainId='', lastCheck=null, busy=false, connecting=false, providerBound=null;
+$('expectedDeployer').textContent=EXPECTED_DEPLOYER;
+$('bytecodeHash').textContent=BIN_SHA256;
+const isAddress=s=>/^0x[0-9a-fA-F]{40}$/.test(s);
+const same=(a,b)=>typeof a==='string'&&typeof b==='string'&&a.toLowerCase()===b.toLowerCase();
+// EIP-1193 normally returns a hex string, but certain mobile wallets return a decimal number.
+// Normalize before comparing, displaying, estimating gas, or sending any transaction.
+function normalizeChainId(value){
+  try{
+    if(typeof value==='number'){
+      if(!Number.isSafeInteger(value)||value<0)return '';
+      return '0x'+value.toString(16);
+    }
+    if(typeof value==='bigint')return value>=0n?'0x'+value.toString(16):'';
+    if(typeof value==='string'){
+      const v=value.trim();
+      if(!/^(?:0[xX][0-9a-fA-F]+|[0-9]+)$/.test(v))return '';
+      const id=BigInt(v);
+      return id>=0n?'0x'+id.toString(16):'';
+    }
+    return '';
+  }catch(_){return '';}
+}
+const errText=e=>e && (e.shortMessage || e.message || String(e)) || '未知錯誤';
+const toBig=v=>BigInt(v);
+const hexQuantity=v=>BigInt(v).toString(16);
+const eth=v=>{let x=toBig(v),s=(x/1000000000000000000n).toString(),f=(x%1000000000000000000n).toString().padStart(18,'0').slice(0,9).replace(/0+$/,'');return s+(f?'.'+f:'')+' ETH';};
+const log=msg=>{$('log').textContent=msg;};
+const showProvider=msg=>{$('providerStatus').textContent=msg;};
+const connectionFeedback=(msg,kind='warn')=>{const box=$('connectFeedback');box.textContent=msg;box.className=kind;};
+const updateUI=()=>{$('connectedAddress').textContent=currentAccount||'尚未連線';$('chainDisplay').textContent=chainId?((chainId===CHAIN_ID)?'Ethereum Sepolia ✓':'非 Sepolia（'+chainId+'）'):'尚未確認';$('deploy').disabled=!lastCheck||busy||!$('agree').checked;$('connect').disabled=connecting||busy;$('connect').textContent=connecting?'等待 Trust Wallet 回應中…':'連接錢包（僅授權查看帳戶）';};
+function findProvider(){
+  const arr=[];
+  if(window.trustwallet?.ethereum?.request) arr.push(window.trustwallet.ethereum);
+  if(window.trustwallet?.request) arr.push(window.trustwallet);
+  if(window.ethereum?.providers) arr.push(...window.ethereum.providers);
+  if(window.ethereum?.request) arr.push(window.ethereum);
+  if(window.web3?.currentProvider?.request) arr.push(window.web3.currentProvider);
+  const candidates=[...new Set(arr)].filter(p=>p&&typeof p.request==='function');
+  return candidates.find(p=>p.isTrust===true || p.isTrustWallet===true) || candidates[0] || null;
+}
+function discover(){
+  const found=findProvider();
+  if(found!==provider){provider=found;lastCheck=null;}
+  showProvider(provider?'已偵測到錢包介面。請點選「連接錢包」並核對地址。':'目前找不到可用的錢包介面。請在 Trust Wallet 內建 DApp 瀏覽器開啟此 HTTPS 頁面。');
+  if(provider && provider!==providerBound && typeof provider.on==='function'){
+    providerBound=provider;
+    provider.on('accountsChanged',accounts=>{
+      currentAccount=Array.isArray(accounts)?(accounts[0]||''):'';
+      lastCheck=null;$('balanceDisplay').textContent='請重新查詢';updateUI();
+      connectionFeedback(currentAccount?'錢包通知帳戶已更新，請核對完整地址並按「更新網路與測試 ETH 餘額」。':'錢包已中斷連線；請重新授權。');
+    });
+    provider.on('chainChanged',id=>{
+      chainId=normalizeChainId(id);lastCheck=null;
+      $('balanceDisplay').textContent='請重新查詢';updateUI();
+      connectionFeedback('網路已變更，請核對是否為 Ethereum Sepolia，再按「更新網路與測試 ETH 餘額」。');
+    });
+  }
+}
+async function rpc(method,params=[]){if(!provider)throw Error('未偵測到錢包介面');return provider.request({method,params});}
+async function refresh(){
+  if(!provider)discover();if(!provider)throw Error('找不到錢包介面');
+  const accs=await rpc('eth_accounts');
+  currentAccount=Array.isArray(accs)?(accs[0]||''):'';
+  chainId=normalizeChainId(await rpc('eth_chainId'));
+  if(!chainId)throw Error('錢包未回傳可辨識的網路 ID；請暫停部署，重新檢查錢包網路設定。');
+  if(currentAccount && chainId===CHAIN_ID){
+    $('balanceDisplay').textContent=eth(await rpc('eth_getBalance',[currentAccount,'latest']))+'（測試網）';
+  }else{$('balanceDisplay').textContent='請先連線並切換至 Sepolia';}
+  lastCheck=null;updateUI();
+  return currentAccount;
+}
+$('connect').onclick=async()=>{
+  if(connecting)return;
+  connecting=true;updateUI();
+  connectionFeedback('按鈕已收到操作，正在請求 Trust Wallet 授權。請查看是否跳出錢包視窗；請勿重複按連線。');
+  // Some Android wallet browsers pause the request while the connection sheet is open.
+  // This reminder does not repeat any request or assume a successful connection.
+  const reminder=setTimeout(()=>{
+    if(connecting)connectionFeedback('已等待 20 秒，仍未收到錢包回應。若授權視窗已關閉，請截圖此狀態；先不要重複授權或部署。');
+  },20000);
+  try{
+    if(!provider)discover();
+    if(!provider)throw Error('無法找到 Trust Wallet 注入介面');
+    connectionFeedback('已偵測到錢包，等待「eth_requestAccounts」授權回應…');
+    const accounts=await rpc('eth_requestAccounts');
+    const granted=Array.isArray(accounts)?(accounts[0]||''):'';
+    if(!isAddress(granted))throw Error('錢包未回傳有效地址，請檢查是否已核准連線。');
+    currentAccount=granted;updateUI();
+    connectionFeedback('錢包已回傳帳戶：'+granted+'。正在確認網路與餘額…','ok');
+    const refreshed=await refresh();
+    if(!refreshed){
+      connectionFeedback('錢包已授權，但 eth_accounts 查詢仍回傳空帳戶。請截圖此訊息；不要部署。');
+      throw Error('授權成功後無法從 eth_accounts 取得帳戶。');
+    }
+    if(!same(refreshed,granted))throw Error('授權地址與後續查詢地址不同，請檢查 Trust Wallet 帳戶。');
+    if(!same(refreshed,EXPECTED_DEPLOYER)){
+      connectionFeedback('目前錢包是 '+refreshed+'，不是預設的 IPT Sepolia Deployer。請先切換至正確帳戶，勿部署。');
+      log('錢包地址不符，請先切換至正確部署錢包。');
+    }else{
+      const isSepolia=chainId===CHAIN_ID;
+      connectionFeedback('錢包連線成功，地址已核對。'+(isSepolia?'目前網路為 Sepolia，請核對測試 ETH 餘額。':'目前尚非 Sepolia，請使用下方按鈕切換網路。'),'ok');
+      log('已取得帳戶授權。請繼續核對網路與餘額。');
+    }
+  }catch(e){
+    connectionFeedback('連線或查詢失敗：'+errText(e)+'。若曾出現授權視窗，請截圖此訊息並暫停部署。');
+    log('錢包連線／查詢失敗：'+errText(e));
+  }finally{clearTimeout(reminder);connecting=false;updateUI();}
+};
+
+function rpcErrorCode(e){
+  const values=[e?.code,e?.data?.code,e?.error?.code,e?.data?.originalError?.code];
+  for(const v of values){
+    if(typeof v==='number')return v;
+    if(typeof v==='string' && /^-?\d+$/.test(v))return Number(v);
+  }
+  return null;
+}
+function looksLikeUnknownChain(e){
+  const code=rpcErrorCode(e);
+  if(code===4902)return true;
+  const m=errText(e).toLowerCase();
+  return /unknown chain|unrecognized chain|not added|does not exist|4902|chain.*not.*found|network.*not.*found/.test(m);
+}
+async function pause(ms){return new Promise(r=>setTimeout(r,ms));}
+async function testSepoliaRpc(){
+  for(const url of SEPOLIA_RPCS){
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),7000);
+    try{
+      const res=await fetch(url,{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_chainId',params:[]}),
+        signal:ctrl.signal
+      });
+      const data=await res.json();
+      const id=normalizeChainId(data?.result);
+      if(res.ok && id===CHAIN_ID)return url;
+    }catch(_){}
+    finally{clearTimeout(timer);}
+  }
+  return SEPOLIA_RPCS[0];
+}
+async function ensureSepolia(){
+  if(!provider)discover();
+  if(!provider)throw Error('未偵測到錢包介面');
+  if(!currentAccount)throw Error('請先完成錢包連線');
+  const existing=normalizeChainId(await rpc('eth_chainId'));
+  if(existing===CHAIN_ID){
+    await refresh();
+    return 'already';
+  }
+
+  connectionFeedback('正在要求錢包切換到 Ethereum Sepolia…');
+  try{
+    await rpc('wallet_switchEthereumChain',[{chainId:CHAIN_ID}]);
+    await pause(700);
+    await refresh();
+    if(chainId!==CHAIN_ID)throw Error('錢包回報切換完成，但目前網路仍不是 Sepolia。');
+    return 'switched';
+  }catch(e){
+    if(!looksLikeUnknownChain(e))throw e;
+  }
+
+  connectionFeedback('錢包尚未加入 Sepolia，正在檢查公開 RPC 並要求新增網路…');
+  const healthy=await testSepoliaRpc();
+  const rpcUrls=[healthy,...SEPOLIA_RPCS.filter(x=>x!==healthy)];
+  const params={...SEPOLIA_ADD_PARAMS,rpcUrls};
+
+  await rpc('wallet_addEthereumChain',[params]);
+  await pause(700);
+
+  // Some wallets add the chain without switching to it.
+  try{
+    await rpc('wallet_switchEthereumChain',[{chainId:CHAIN_ID}]);
+  }catch(e){
+    // If the wallet already switched while adding, ignore only when chain is now Sepolia.
+    const now=normalizeChainId(await rpc('eth_chainId'));
+    if(now!==CHAIN_ID)throw e;
+  }
+
+  await pause(700);
+  await refresh();
+  if(chainId!==CHAIN_ID)throw Error('Sepolia 已加入，但錢包仍未切換到 Sepolia。請不要部署。');
+  return 'added';
+}
+$('switch').onclick=async()=>{
+  try{
+    if(!provider)discover();
+    if(!provider)throw Error('未偵測到錢包介面');
+    if(!currentAccount)throw Error('請先完成錢包連線');
+    $('switch').disabled=true;
+    connectionFeedback('正在處理 Sepolia 網路，請依 Trust Wallet 畫面確認；不要切換到 Ethereum 主網。');
+    const result=await ensureSepolia();
+    const msg=result==='already'?'目前已在 Ethereum Sepolia。':
+      result==='switched'?'已切換至 Ethereum Sepolia。':
+      '已加入並切換至 Ethereum Sepolia。';
+    connectionFeedback(msg+' 請核對部署錢包地址與測試 ETH 餘額。','ok');
+    log(msg+' Chain ID：11155111（0xaa36a7）。');
+  }catch(e){
+    const code=rpcErrorCode(e);
+    const suffix=code!==null?'（錯誤碼 '+code+'）':'';
+    connectionFeedback('Sepolia 處理失敗：'+errText(e)+suffix+'。請停止部署，不要繞過錢包安全警告。');
+    log('Sepolia 處理失敗：'+errText(e)+suffix+'。若 Trust Wallet 拒絕新增網路或顯示節點／安全警告，請保留畫面並停止部署。');
+  }finally{
+    $('switch').disabled=false;
+  }
+};
+$('refresh').onclick=async()=>{try{connectionFeedback('正在重新查詢帳戶、網路與餘額…');await refresh();connectionFeedback(currentAccount?'已更新。請核對上方完整錢包地址、網路及測試幣餘額。':'尚未取得已授權的錢包帳戶，請重新連線。',currentAccount?'ok':'warn');log('已更新網路、帳戶與餘額。');}catch(e){connectionFeedback('更新失敗：'+errText(e));log('更新失敗：'+errText(e));}};
+$('owner').oninput=()=>{lastCheck=null;updateUI();};
+$('agree').onchange=updateUI;
+const buildData=owner=>BYTECODE+owner.slice(2).toLowerCase().padStart(64,'0');
+async function preflight(){
+  await refresh();
+  if(chainId!==CHAIN_ID)throw Error('不是 Ethereum Sepolia（11155111），禁止部署。');
+  if(!currentAccount || !same(currentAccount,EXPECTED_DEPLOYER))throw Error('目前連接的不是 IPT Sepolia Deployer，請核對完整公開地址。');
+  const owner=$('owner').value.trim();
+  if(!isAddress(owner))throw Error('管理者公開地址格式不正確：必須 0x 開頭、共 42 個字元。請從原管理者錢包重新複製。');
+  if(same(owner,currentAccount))throw Error('管理者地址不可與部署錢包相同。請使用原本分離的管理者錢包公開地址。');
+  const data=buildData(owner);
+  const tx={from:currentAccount,data,value:'0x0'};
+  const gas=toBig(await rpc('eth_estimateGas',[tx]));
+  const gasPrice=toBig(await rpc('eth_gasPrice'));
+  const bal=toBig(await rpc('eth_getBalance',[currentAccount,'latest']));
+  const est=gas*gasPrice;
+  if(bal<est)throw Error('部署錢包的 Sepolia 測試 ETH 不足支付預估 Gas。請等測試幣到帳。');
+  const ownerAtCheck=owner,accountAtCheck=currentAccount;
+  lastCheck={owner:ownerAtCheck,account:accountAtCheck,data,gas,gasPrice};
+  $('gasDisplay').textContent='預估 Gas：'+gas.toString()+' units（錢包最終估算可能不同）';
+  $('costDisplay').textContent='估算測試網手續費：'+eth(est)+'；目前測試網餘額：'+eth(bal)+'（非交易保證上限）';
+  $('ownerDisplay').textContent='指定合約管理者：'+ownerAtCheck;
+  $('txDetails').style.display='block';
+  updateUI();
+  return lastCheck;
+}
+$('estimate').onclick=async()=>{lastCheck=null;updateUI();try{await preflight();log('預檢通過：已估算 Gas。請核對管理者地址、部署錢包與 Sepolia 網路，再自行決定是否部署。');}catch(e){log('尚未符合部署條件：'+errText(e));}};
+async function waitReceipt(hash){for(let i=0;i<45;i++){await new Promise(r=>setTimeout(r,4000));let receipt=await rpc('eth_getTransactionReceipt',[hash]);if(receipt)return receipt;}return null;}
+$('deploy').onclick=async()=>{
+ if(busy || !lastCheck || !$('agree').checked)return;
+ busy=true;updateUI();let sentHash='';
+ try{
+   const old=lastCheck;lastCheck=null;updateUI();
+   if(!$('agree').checked)throw Error('尚未勾選部署前確認。');
+   const fresh=await preflight();
+   if(!same(fresh.owner,old.owner)||!same(fresh.account,old.account)||fresh.data!==old.data)throw Error('部署資料曾改變，請重新估算。');
+   const ok=window.confirm('最後確認：只在 Ethereum Sepolia 部署 Independent Points。\n部署錢包：'+fresh.account+'\n合約管理者：'+fresh.owner+'\n預估測試 Gas：'+eth(fresh.gas*fresh.gasPrice)+'\n\n確認後 Trust Wallet 才會要求您簽署建立合約交易。');
+   if(!ok){log('已取消，沒有送出部署交易。');return;}
+   chainId=normalizeChainId(await rpc('eth_chainId'));
+   const accounts=await rpc('eth_accounts');
+   if(chainId!==CHAIN_ID||!accounts?.[0]||!same(accounts[0],fresh.account))throw Error('錢包或網路已改變，部署已停止。');
+   // Only public from address, compiled creation bytecode, and value=0 are passed to the wallet.
+   sentHash=await rpc('eth_sendTransaction',[{from:fresh.account,data:fresh.data,value:'0x0'}]);
+   if(!/^0x[0-9a-fA-F]{64}$/.test(sentHash))throw Error('錢包回傳了非預期的交易雜湊。');
+   const a=document.createElement('a');a.href=EXPLORER+'/tx/'+sentHash;a.target='_blank';a.rel='noopener noreferrer';a.textContent='在 Sepolia Etherscan 查看部署交易：'+sentHash;$('txLink').replaceChildren(a);
+   log('交易已送出，等待 Sepolia 網路確認。\n交易雜湊：'+sentHash+'\n請勿重複送出。');
+   const receipt=await waitReceipt(sentHash);
+   if(!receipt){log('已送出交易，但查詢等待逾時。請使用上方交易雜湊到 Sepolia Etherscan 查詢，先不要重複部署。');return;}
+   if(toBig(receipt.status||'0x0')!==1n){log('部署交易未成功執行。請開啟上方 Sepolia Etherscan 交易詳情查看原因。');return;}
+   if(!isAddress(receipt.contractAddress||'')){log('交易已確認，但收據沒有合約地址，請先查核交易內容。');return;}
+   const contract=receipt.contractAddress;
+   const link=document.createElement('a');link.href=EXPLORER+'/address/'+contract;link.target='_blank';link.rel='noopener noreferrer';link.textContent='查看新 IPT 合約：'+contract;$('contractLink').replaceChildren(link);
+   const code=await rpc('eth_getCode',[contract,'latest']);
+   if(!code||code==='0x')throw Error('未找到合約執行碼，請使用區塊瀏覽器確認。');
+   let actual='';
+   try{const o=await rpc('eth_call',[{to:contract,data:'0x8da5cb5b'},'latest']);if(/^0x[0-9a-fA-F]{64}$/.test(o))actual='0x'+o.slice(-40);}catch(e){log('已部署，但目前無法讀取 owner()：'+errText(e));return;}
+   if(!actual||!same(actual,fresh.owner)){log('⚠ 合約已部署，但 owner() 不符合預期。預期：'+fresh.owner+'；實際：'+(actual||'無法解析')+'。請暫停後續操作。');return;}
+   log('✅ Sepolia 測試網部署已確認！\n合約地址：'+contract+'\n合約 owner()：'+actual+'\n部署交易：'+sentHash+'\n請保存合約地址與交易雜湊，再進行後續驗證。');
+ }catch(e){log((sentHash?'交易已送出，後續查驗出現問題：':'尚未完成部署：')+errText(e)+(sentHash?'\n請用上方交易雜湊查核，勿直接重複部署。':''));}
+ finally{busy=false;lastCheck=null;$('agree').checked=false;updateUI();}
+};
+window.addEventListener('ethereum#initialized',()=>{if(!provider)discover();},{once:true});
+window.addEventListener('unhandledrejection',event=>{if(!connecting && !busy)connectionFeedback('網頁收到未處理的非同步錯誤：'+errText(event.reason));});
+discover();updateUI();
+</script>
+</body></html>
